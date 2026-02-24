@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id		String		@id @default(uuid())
+  name		String
+  email		String		@unique
+  password	String
+  active	Boolean		@default(false)
+  
+  messages	Message[]	// 1-many
+  poll		Poll[]		// 1-many
+  createdRooms	Room[]		// 1-many
+  pollVotes	PollVote[]	// 1-many
+  rooms		UserRoom[]	// many-many
+}
+
+model Message {
+  id        	String   	@id @default(uuid())
+  userName  	String
+  content   	String
+  createdAt 	DateTime 	@default(now())
+
+  userId	String
+  user		User		@relation(fields: [userId], references: [id])
+
+  roomId	String
+  room		Room		@relation(fields: [roomId], references: [id])
+}
+
+model Room {
+  id		String 		@id @default(uuid())
+  name		String
+  
+  createdById	String
+  createdBy	User		@relation(fields: [createdById], references: [id])
+
+  members	UserRoom[]
+  messages	Message[]
+  polls		Poll[]
+}
+
+model UserRoom {
+  id		String		@id @default(uuid())
+  
+  userId	String
+  user		User		@relation(fields: [userId], references: [id])
+
+  roomId	String
+  room		Room		@relation(fields: [roomId], references: [id])
+
+  @@unique([userId, roomId]) // prevent duplicate members
+}
+
+model Poll {
+  id		String		@id @default(uuid())
+  question	String
+  createdAt	DateTime	@default(now())
+
+  createdBy	String
+  user		User		@relation(fields: [createdBy], references: [id])
+
+  pollRoom	String
+  poll		Room		@relation(fields: [pollRoom], references: [id])
+
+  options	PollOption[]
+}
+
+model PollOption {
+  id 		String		@id @default(uuid())
+  text		String
+  createdAt 	DateTime 	@default(now())
+
+  question	String
+  poll		Poll		@relation(fields: [question], references: [id])
+
+  pollVotes	PollVote[]
+}
+
+model PollVote {
+  id 		String		@id @default(uuid())
+  createdAt 	DateTime 	@default(now())
+
+  userId	String
+  user		User		@relation(fields: [userId], references: [id])
+
+  optionId	String
+  option	PollOption	@relation(fields: [optionId], references: [id])
+
+  @@unique([userId, optionId]) // 1 vote per user per option
+}
