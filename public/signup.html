@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseChat — Sign Up</title>
+    <link rel="stylesheet" href="./auth.css" />
+</head>
+<body>
+
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="auth-wrapper">
+
+        <div class="auth-card">
+
+            <div class="auth-brand">
+                <div class="brand-icon">⚡</div>
+                <h1 class="brand-name">PulseChat</h1>
+            </div>
+
+            <div class="auth-header">
+                <h2>Create account</h2>
+                <p>Join the conversation today</p>
+            </div>
+
+            <div id="error-msg" class="error-msg hidden"></div>
+            <div id="success-msg" class="success-msg hidden">Account created! Redirecting...</div>
+
+            <form id="signup-form">
+
+                <div class="field-group">
+                    <label for="name">Display Name</label>
+                    <input type="text" id="name" placeholder="John Doe" required />
+                </div>
+
+                <div class="field-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="you@example.com" required />
+                </div>
+
+                <div class="field-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Min 6 characters" required />
+                </div>
+
+                <button type="submit" class="btn-primary" id="submit-btn">
+                    <span id="btn-text">Create Account</span>
+                    <span id="btn-loader" class="hidden">...</span>
+                </button>
+
+            </form>
+
+            <p class="auth-switch">
+                Already have an account? <a href="/login.html">Sign in</a>
+            </p>
+
+        </div>
+
+    </div>
+
+    <script>
+        const form = document.querySelector("#signup-form");
+        const errorMsg = document.querySelector("#error-msg");
+        const successMsg = document.querySelector("#success-msg");
+        const btnText = document.querySelector("#btn-text");
+        const btnLoader = document.querySelector("#btn-loader");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const name = document.querySelector("#name").value.trim();
+            const email = document.querySelector("#email").value.trim();
+            const password = document.querySelector("#password").value;
+
+            errorMsg.classList.add("hidden");
+            successMsg.classList.add("hidden");
+
+            if (password.length < 6) {
+                errorMsg.textContent = "Password must be at least 6 characters.";
+                errorMsg.classList.remove("hidden");
+                return;
+            }
+
+            btnText.classList.add("hidden");
+            btnLoader.classList.remove("hidden");
+
+            try {
+                const res = await fetch("/auth/signup", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, email, password })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    errorMsg.textContent = data.error || "Signup failed.";
+                    errorMsg.classList.remove("hidden");
+                } else {
+                    successMsg.classList.remove("hidden");
+                    setTimeout(() => {
+                        window.location.href = "/login.html";
+                    }, 1500);
+                }
+            } catch (err) {
+                errorMsg.textContent = "Something went wrong. Try again.";
+                errorMsg.classList.remove("hidden");
+            } finally {
+                btnText.classList.remove("hidden");
+                btnLoader.classList.add("hidden");
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat rooms</title>
+    <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+    
+    <div id="contianer">
+        <div id="left">
+            <div id="left-top">
+                <h1>Rooms</h1>
+		<button id="logout-btn">Logout</button>
+                <ul id="rooms-list">
+                </ul>
+            </div>
+
+            <div id="left-bottom">
+                <h1>Active Users</h1>
+                <ul id="users-list">
+                </ul>
+
+                <form action="" id="create-room-form">
+                    <div class="input-bar">
+                        <input type="text" id="room-name" placeholder="Enter room name" />
+                        <button type="submit">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="right">
+
+            <h1 id="room-title">General Chat room</h1>
+            <div id="chatbox"></div>
+
+            <form action="" id="message-form">
+                <div class="input-bar">
+                    <input type="text" id="message">
+                    <button type="submit">Send</button>
+                </div>
+            </form>
+
+
+            <form action="" id="poll-form">
+                
+                <div id="poll-question">
+                    <h3 id="poll-question-heading">Question</h3>
+                    <input type="text" id="poll-question-input" placeholder="Ask a question">
+                </div>
+                
+                <!-- atleast add two options  -->
+
+                <div id="poll-options">
+                    <h3 id="poll-options-heading">Options</h3>
+
+                    <div id="poll-options-list">
+                        <input type="text" id="poll-option-1" placeholder="+ Add">
+                        <input type="text" id="poll-option-2" placeholder="+ Add">
+                    </div>
+
+                    <button type="button" id="add-option">+</button>
+
+                    <button type="submit">Create Poll</button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+
+	const token = localStorage.getItem("token");
+	if (!token) window.location.href = "/login.html";
+	const socket = io({ auth: { token } });
+
+	const payload = JSON.parse(atob(token.split('.')[1]));
+	const currentUser = payload.userId;
+
+	let currentRoom = null;
+
+	const roomTitle = document.querySelector("#room-title")
+
+	const roomList = document.querySelector("#room-list")
+	const usersList = document.querySelector("#users-list");
+
+	const messageForm = document.querySelector("#message-form");
+        const messageInput = document.querySelector("#message-form input");
+        const chatbox = document.querySelector("#chatbox")
+
+
+	// ------ Code
+
+	console.log(currentUser)
+
+	// === Delete button
+	document.getElementById("logout-btn").addEventListener("click", () => {
+		socket.emit("user-logout", currentUser)
+
+    		localStorage.removeItem("token");
+    		socket.disconnect();
+    		window.location.href = "/login.html";
+	});
+
+
+	// ------------------------ Sending
+	
+
+
+	// ------------------------ User Join
+
+	socket.emit("user-join", currentUser);	
+	
+	// === User join res
+	socket.on("user-join-res", (activeUsers) => {
+		console.log(activeUsers)
+
+        	usersList.innerHTML = "";
+
+            	let li = null;
+            	for (let key of activeUsers){
+                	console.log(key);
+                	if (key.id != currentUser){
+                    		li = document.createElement("li");
+                    		li.innerText = key.name;
+				li.dataset.userId = key.id
+                   		usersList.appendChild(li);
+                	}
+            	}
+	})
+
+	// -------------------------- Public room join
+
+
+	// -------------------------- Message sending
+
+	messageForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            const message = messageInput.value.trim();
+
+            chatbox.innerHTML += `<div class="my-msg">${message}</div>`;
+
+
+	  	console.log("is message getting till here: ", message)
+            //if (targetUser){
+                socket.emit("private-room-message", {
+                    room: roomName,
+                    message
+                });
+            //}
+            //else{
+                //socket.emit("public-room-message", {
+                //    room: roomName,
+                //    message
+                //});
+            //}
+
+            messageInput.value = "";
+        })
+
+	// -------------------------- Private room join
+	usersList.addEventListener("click", (e) => {
+            if (e.target.tagName === "LI") {
+                console.log(`Want to chat with user named ${e.target.innerText}`);
+
+                chatbox.innerHTML = "";
+		
+		// getting room names from users id's
+                targetUser = e.target.dataset.userId;
+                roomName = [currentUser, targetUser].sort().join("-");
+		console.log(`${currentUser} wants to create private room: ${roomName} with ${targetUser}`);
+
+		// sending to backend to load old chats or create new room
+                socket.emit("private-room-join", { roomName, targetUser });
+
+		// show the old chats
+		socket.on("private-room-join-res", ({ user, roomMessages }) => {
+			for (let msg of roomMessages){
+				if (msg.userId === currentUser){
+					chatbox.innerHTML += `<div class="my-msg">${msg.content}</div>`
+				}
+				else{
+					chatbox.innerHTML += `<div class="other-msg">${msg.content}</div>`
+				}
+			}
+		})
+
+            }
+        });
+
+	socket.on("private-room-message-res", ({ message }) => {
+            chatbox.innerHTML += `<div class="other-msg">${message}</div>`;
+        })
+
+    </script>
+</body>
+</html>

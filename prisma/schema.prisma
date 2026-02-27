@@ -36,7 +36,7 @@ model Message {
 
 model Room {
   id		String 		@id @default(uuid())
-  name		String
+  name		String		@unique
   
   createdById	String
   createdBy	User		@relation(fields: [createdById], references: [id])
