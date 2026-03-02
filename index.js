@@ -38,7 +38,7 @@ io.use((socket, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.user = decoded.name;    // now socket.user comes from real DB
+        //socket.user = decoded.name;    // now socket.user comes from real DB
         socket.userId = decoded.userId;
         next();
     } catch (err) {
@@ -51,8 +51,14 @@ io.on("connection", (socket) => {
 	// ======================= joining
 	socket.on("user-join", async (currentUser) => {
 		
-		// user id in socket
-		socket.user = currentUser;
+		// need to save user name here, 
+		const singleUser = await prisma.user.findUnique({
+			where: {
+				id: socket.userId
+			}
+		})
+
+		socket.user = singleUser.name;
 
 
 		// get all active users
@@ -70,6 +76,110 @@ io.on("connection", (socket) => {
 		// when a new user join, it broadcast to all the users
 		io.emit("user-join-res", activeUsers);
 	})
+
+	// ====================== Public Room
+	
+	const sendPublicRooms = async () => {
+		const publicRooms = await prisma.room.findMany({
+			where: {
+				isPrivate: false
+			}
+		})
+
+		for (let pr of publicRooms){
+			console.log(`Sending public rooms ${pr.name}`)
+		}
+
+		io.emit("public-rooms", publicRooms);
+
+	}
+
+	sendPublicRooms();
+
+
+	socket.on("new-public-room", async ({ newRoom }) => {
+		console.log(`Incomding +++++++++++ ${newRoom}`)
+
+		
+		console.log("------- creating room -------")
+
+		const exists = await prisma.room.findUnique({
+			where: {
+				name: newRoom
+			}
+		})
+
+		console.log(`exist:  ${exists}`)
+
+		if (exists == null){
+			const createRoom = await prisma.room.create({
+				data: {
+					name: newRoom,
+					createdById: socket.userId,
+				}
+
+			})
+
+			await prisma.userRoom.create({
+				data: {
+					userId: socket.userId,
+					roomId: createRoom.id
+				}
+			})
+
+			console.log(createRoom)
+		}
+		else {
+			socket.emit("duplicate-room-alert")
+			
+		}
+	})
+
+	socket.on("public-room-join", async ({ room }) => {
+		console.log("User wants to join the room: ", room);
+
+		const findRoom = await prisma.room.findUnique({
+			where: {
+				name: room
+			},
+			include: {
+				messages: true
+			}
+		})
+
+		socket.roomId = findRoom.id;
+
+		console.log(findRoom)
+		console.log(findRoom.messages)
+
+		socket.emit("public-room-join-res", { chats: findRoom.messages })
+	})
+
+	socket.on("public-room-message", async ({ room, message }) => {
+		console.log(`On Public Room message getting, room: ${room}, message ${message}`)
+
+		// store messages in database and emit them
+		const dbMessage = await prisma.message.create({
+			data: {
+				content: message, 
+				userId: socket.userId,
+				roomId: socket.roomId,
+				userName: socket.user
+			}
+		})
+
+		console.log("My db messages ::::::::+::::::::", dbMessage)
+
+		socket.emit("public-room-message-res", { chats: dbMessage })
+	})
+
+
+
+
+
+
+
+
 	
 	// ======================= Private Room
 	socket.on("private-room-join", async ({ roomName, targetUser }) => {
@@ -135,7 +245,7 @@ io.on("connection", (socket) => {
 		const dbMessage = await prisma.message.create({
 			data: {
 				content: message, 
-				userId: socket.user,
+				userId: socket.userId,
 				roomId: socket.roomId,
 				userName: socket.user
 			}
@@ -143,7 +253,9 @@ io.on("connection", (socket) => {
 
 		console.log("My db messages ::::::::+::::::::", dbMessage)
 
-		socket.to(room).emit("private-room-message-res", { message })
+		console.log("socket.roomId:::::::::", socket.roomId)
+
+		socket.to(socket.roomId).emit("private-room-message-res", { message })
 	})
 
 

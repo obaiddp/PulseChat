@@ -37,7 +37,8 @@ model Message {
 model Room {
   id		String 		@id @default(uuid())
   name		String		@unique
-  
+  isPrivate	Boolean		@default(false)
+
   createdById	String
   createdBy	User		@relation(fields: [createdById], references: [id])
 

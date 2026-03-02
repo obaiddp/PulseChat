@@ -13,7 +13,7 @@
             <div id="left-top">
                 <h1>Rooms</h1>
 		<button id="logout-btn">Logout</button>
-                <ul id="rooms-list">
+                <ul id="room-list">
                 </ul>
             </div>
 
@@ -83,11 +83,16 @@
 	const currentUser = payload.userId;
 
 	let currentRoom = null;
+	let targetUser = null;
+	let roomName = null
 
 	const roomTitle = document.querySelector("#room-title")
 
 	const roomList = document.querySelector("#room-list")
 	const usersList = document.querySelector("#users-list");
+
+	const createRoomForm = document.querySelector("#create-room-form");
+        const roomNameInput = document.querySelector("#room-name");
 
 	const messageForm = document.querySelector("#message-form");
         const messageInput = document.querySelector("#message-form input");
@@ -107,9 +112,6 @@
     		window.location.href = "/login.html";
 	});
 
-
-	// ------------------------ Sending
-	
 
 
 	// ------------------------ User Join
@@ -136,6 +138,73 @@
 
 	// -------------------------- Public room join
 
+	socket.on("public-rooms", (publicRooms) => {
+		roomList.innerHTML = "";
+
+		for (let pr of publicRooms){
+			console.log(pr.name)
+			roomList.innerHTML += `<li>${pr.name}</li>`
+		}
+
+		console.log(publicRooms)
+	})
+
+	// make create room work
+
+	createRoomForm.addEventListener("click", (e) => {
+		e.preventDefault();
+
+		const newRoom = roomNameInput.value;
+		console.log(newRoom);
+
+		socket.emit("new-public-room", {currentUser, newRoom})
+
+		roomNameInput.value = ""
+	})
+
+	socket.on("duplicate-room-alert", () => {
+		console.log("Gettting duplicate rooms")
+	})
+
+	roomList.addEventListener("click", (e) => {
+		if (e.target.tagName === "LI"){
+			const targetRoom = e.target.innerHTML;
+
+			roomTitle.innerText = `${e.target.innerText}`;
+
+			console.log(`User clicked on ${targetRoom}`)
+
+			chatbox.innerHTML = "";
+			targetUser = null;
+
+
+			socket.emit("public-room-join", { room: targetRoom })
+		}	
+	})
+
+
+	socket.on("public-room-join-res", ({ chats }) => {
+
+		console.log("old chats for public room: ::: :: : :  ;: : ", chats)
+
+		// loading users old chats
+            	chatbox.innerHTML = "";
+            	for (let chat of chats) {
+                	if (chat.userId === currentUser){
+				console.log(`Is chat.userName: ${chat.userName} equal to currentUser: ${currentUser}`)
+
+                    		chatbox.innerHTML += `<div class="my-msg">${chat.userName}: ${chat.content}</div>`;
+                	}
+                	else{
+                    		chatbox.innerHTML += `<div class="other-msg">${chat.userName}: ${chat.content}</div>`;
+                	}
+            	}
+	})
+
+	socket.on("public-room-message-res", () => {
+		console.log("Got the message")
+	})
+	
 
 	// -------------------------- Message sending
 
@@ -146,20 +215,20 @@
 
             chatbox.innerHTML += `<div class="my-msg">${message}</div>`;
 
+	    console.log("++++++++++++++ Target User +++++++++++++++: ", targetUser)
 
-	  	console.log("is message getting till here: ", message)
-            //if (targetUser){
+            if (targetUser){
                 socket.emit("private-room-message", {
                     room: roomName,
                     message
                 });
-            //}
-            //else{
-                //socket.emit("public-room-message", {
-                //    room: roomName,
-                //    message
-                //});
-            //}
+            }
+            else{
+                socket.emit("public-room-message", {
+                    room: roomName,
+                    message
+                });
+            }
 
             messageInput.value = "";
         })
@@ -169,6 +238,7 @@
             if (e.target.tagName === "LI") {
                 console.log(`Want to chat with user named ${e.target.innerText}`);
 
+		roomTitle.innerText = `${e.target.innerText}`;
                 chatbox.innerHTML = "";
 		
 		// getting room names from users id's
@@ -179,22 +249,24 @@
 		// sending to backend to load old chats or create new room
                 socket.emit("private-room-join", { roomName, targetUser });
 
-		// show the old chats
-		socket.on("private-room-join-res", ({ user, roomMessages }) => {
-			for (let msg of roomMessages){
-				if (msg.userId === currentUser){
-					chatbox.innerHTML += `<div class="my-msg">${msg.content}</div>`
-				}
-				else{
-					chatbox.innerHTML += `<div class="other-msg">${msg.content}</div>`
-				}
-			}
-		})
-
             }
         });
 
+	// show the old chats
+	socket.on("private-room-join-res", ({ roomMessages }) => {
+		for (let msg of roomMessages){
+			if (msg.userId === currentUser){
+				chatbox.innerHTML += `<div class="my-msg">${msg.content}</div>`
+			}
+			else{
+				chatbox.innerHTML += `<div class="other-msg">${msg.content}</div>`
+			}
+		}
+	})
+
 	socket.on("private-room-message-res", ({ message }) => {
+
+	    console.log("message from backend: ", message)
             chatbox.innerHTML += `<div class="other-msg">${message}</div>`;
         })
 
